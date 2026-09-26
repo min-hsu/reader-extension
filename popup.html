@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>頁面朗讀助手</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>頁面朗讀助手</h1>
+
+    <div class="row">
+      <button id="toggleBtn" class="primary-btn">▶ 播放</button>
+      <button id="stopBtn" class="secondary-btn">■ 停止</button>
+    </div>
+
+    <div class="row">
+      <button id="startFromSelectionBtn" class="secondary-btn full-width">從選取處開始朗讀</button>
+    </div>
+
+    <div class="section">
+      <label>語速：<span id="rateValue">1.00</span>x</label>
+      <div class="row">
+        <button id="rateDownBtn">－ 0.25</button>
+        <button id="rateUpBtn">＋ 0.25</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <label for="colorPicker">高亮顏色：</label>
+      <input type="color" id="colorPicker" value="#ffe066" />
+    </div>
+
+    <p class="hint">
+      提示：在網頁上按下 <kbd>空白鍵</kbd> 可快速暫停 / 播放（輸入框中不受影響）。<br />
+      在頁面選取一段文字後，可按上方「從選取處開始朗讀」或右鍵選單「從選取處開始朗讀」，會從該處往後接續朗讀。
+    </p>
+    <p id="statusMsg" class="status"></p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

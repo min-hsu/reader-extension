@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "頁面朗讀助手",
+  "version": "1.0.0",
+  "description": "朗讀網頁內容，空白鍵暫停/播放，可調整語速並高亮朗讀片段。",
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
+  "action": {
+    "default_title": "頁面朗讀助手",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

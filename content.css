@@ -1,0 +1,6 @@
+.reader-extension-highlight {
+  border-radius: 2px;
+  transition: background-color 0.15s ease-in-out;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
