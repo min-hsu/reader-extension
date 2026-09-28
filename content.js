@@ -13,7 +13,7 @@
   const STORAGE_KEY = "reader-extension-settings";
   const DEFAULT_SETTINGS = {
     rate: 1.0,
-    highlightColor: "#ffe066", // 預設高亮背景色（柔和黃）
+    highlightColor: "#001073", // 預設高亮背景色（深藍，文字色會自動轉白以維持可讀性）
     pageShortcutEnabled: true,
     // 頁內暫停/播放快捷鍵，以 KeyboardEvent.code 比對（不受鍵盤配置影響）
     pageShortcut: { code: "Space", ctrlKey: false, altKey: false, shiftKey: false, metaKey: false },
@@ -169,6 +169,23 @@
 
   // ---------- 高亮 ----------
 
+  /**
+   * 依背景色的相對亮度（WCAG relative luminance）決定高亮文字用黑或白，
+   * 讓深色背景（例如預設 #001073）上的文字仍清楚可讀。
+   */
+  function getReadableTextColor(hex) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+    if (!match) return "";
+    const value = parseInt(match[1], 16);
+    const [r, g, b] = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map((c) => {
+      const s = c / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // 亮度 0.179 為黑字 / 白字對比度相等的分界點
+    return luminance > 0.179 ? "#000000" : "#ffffff";
+  }
+
   function clearHighlight() {
     if (state.highlightEl && state.highlightEl.parentNode) {
       const parent = state.highlightEl.parentNode;
@@ -208,6 +225,7 @@
       const mark = document.createElement("span");
       mark.className = "reader-extension-highlight";
       mark.style.backgroundColor = state.settings.highlightColor;
+      mark.style.color = getReadableTextColor(state.settings.highlightColor);
       range.surroundContents(mark);
 
       state.highlightEl = mark;
@@ -469,6 +487,7 @@
     saveSettings();
     if (state.highlightEl) {
       state.highlightEl.style.backgroundColor = color;
+      state.highlightEl.style.color = getReadableTextColor(color);
     }
     notifyStatus();
   }
