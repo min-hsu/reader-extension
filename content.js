@@ -4,7 +4,7 @@
  * 功能：
  * - 掃描頁面可讀文字，切分成句子片段
  * - 使用 Web Speech API 逐句朗讀
- * - 空白鍵快速暫停 / 播放
+ * - 頁內快捷鍵（預設空白鍵，僅朗讀中生效）暫停 / 播放，可在 popup 修改
  * - 語速以 0.25 為單位調整（0.5 ~ 3.0）
  * - 朗讀中的片段以可自訂顏色的 background 高亮
  */
@@ -14,6 +14,9 @@
   const DEFAULT_SETTINGS = {
     rate: 1.0,
     highlightColor: "#ffe066", // 預設高亮背景色（柔和黃）
+    pageShortcutEnabled: true,
+    // 頁內暫停/播放快捷鍵，以 KeyboardEvent.code 比對（不受鍵盤配置影響）
+    pageShortcut: { code: "Space", ctrlKey: false, altKey: false, shiftKey: false, metaKey: false },
   };
 
   const MIN_RATE = 0.5;
@@ -302,12 +305,13 @@
     }
 
     // 先停止目前的朗讀狀態，避免多個 utterance 疊加
-    synth.cancel();
+    resetSynth();
     clearHighlight();
 
     state.segments = freshSegments;
     state.isPlaying = true;
     state.isPaused = false;
+    claimReaderOwnership();
     speakSegment(startIndex);
   }
 
@@ -355,14 +359,23 @@
       return;
     }
 
+    // speechSynthesis 是整個瀏覽器共用的佇列：其他分頁殘留的 utterance
+    // 或全域 paused 狀態會讓本分頁的朗讀排隊卡住，開始前先清乾淨。
+    resetSynth();
     state.isPlaying = true;
     state.isPaused = false;
+    claimReaderOwnership();
     const startIndex = state.currentIndex >= 0 ? state.currentIndex : 0;
     speakSegment(startIndex);
   }
 
+  function resetSynth() {
+    synth.cancel();
+    synth.resume();
+  }
+
   function pauseReading() {
-    if (!state.isPlaying) return;
+    if (!state.isPlaying || state.isPaused) return;
     state.isPaused = true;
     synth.pause();
     notifyStatus();
@@ -371,18 +384,60 @@
   function resumeReading() {
     if (!state.isPaused) return;
     state.isPaused = false;
-    synth.resume();
+    if (synth.speaking || synth.pending) {
+      synth.resume();
+    } else {
+      // 暫停期間 utterance 可能已被其他分頁或瀏覽器丟棄，直接從目前片段重唸
+      resetSynth();
+      claimReaderOwnership();
+      speakSegment(state.currentIndex);
+      return;
+    }
     notifyStatus();
   }
 
   function stopReading() {
+    const wasActive = state.isPlaying;
     state.isPlaying = false;
     state.isPaused = false;
     state.currentIndex = -1;
     synth.cancel();
     clearHighlight();
+    if (wasActive) releaseReaderOwnership();
     notifyStatus();
   }
+
+  // ---------- 跨分頁協調 ----------
+  // 同一時間只允許一個分頁擁有朗讀；由 background 記錄目前擁有者，
+  // 新分頁開始朗讀時會通知舊分頁停止。
+
+  function claimReaderOwnership() {
+    try {
+      chrome.runtime.sendMessage({ type: "reader-claim" });
+    } catch (e) {
+      // 擴充功能被重新載入後 runtime 失效，忽略
+    }
+  }
+
+  function releaseReaderOwnership() {
+    try {
+      chrome.runtime.sendMessage({ type: "reader-release" });
+    } catch (e) {
+      // 同上
+    }
+  }
+
+  // 切換到其他分頁 / 最小化視窗：暫停朗讀，回到分頁後按快捷鍵續讀
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      pauseReading();
+    }
+  });
+
+  // 關閉分頁、重新整理或導向其他頁面：徹底停止，避免語音殘留在共用佇列中繼續播放
+  window.addEventListener("pagehide", () => {
+    if (state.isPlaying) stopReading();
+  });
 
   function togglePlayPause() {
     if (!state.isPlaying) {
@@ -418,7 +473,11 @@
     notifyStatus();
   }
 
-  // ---------- 快捷鍵：空白鍵暫停/播放 ----------
+  // ---------- 頁內快捷鍵（預設空白鍵，可在 popup 修改） ----------
+  // 規則：
+  // - 不含 Ctrl / Alt / Meta 的快捷鍵（例如空白鍵）只在本分頁「朗讀進行中」才攔截，
+  //   沒在朗讀時完全交還給網站（YouTube 播放、頁面捲動等不受影響）。
+  // - 含 Ctrl / Alt / Meta 的組合鍵與網站衝突機率低，未朗讀時也可用來開始朗讀。
 
   function isEditableTarget(target) {
     if (!target) return false;
@@ -428,18 +487,67 @@
     return false;
   }
 
-  document.addEventListener(
+  function matchesShortcut(event, shortcut) {
+    if (!shortcut) return false;
+    return (
+      event.code === shortcut.code &&
+      event.ctrlKey === !!shortcut.ctrlKey &&
+      event.altKey === !!shortcut.altKey &&
+      event.shiftKey === !!shortcut.shiftKey &&
+      event.metaKey === !!shortcut.metaKey
+    );
+  }
+
+  function hasStrongModifier(shortcut) {
+    return !!(shortcut.ctrlKey || shortcut.altKey || shortcut.metaKey);
+  }
+
+  function swallow(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+
+  // 記錄被攔截的按鍵，連同對應的 keypress / keyup 一起吞掉，
+  // 避免在 keyup 才觸發動作的網站仍然收到事件。
+  let swallowedCode = null;
+
+  window.addEventListener(
     "keydown",
     (event) => {
-      if (event.code !== "Space" && event.key !== " ") return;
-      if (isEditableTarget(event.target)) return; // 使用者在輸入框輸入空白，不搶焦點
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const shortcut = state.settings.pageShortcut;
+      if (!state.settings.pageShortcutEnabled) return;
+      if (!matchesShortcut(event, shortcut)) return;
+      if (isEditableTarget(event.target)) return; // 使用者在輸入框輸入，不搶按鍵
+      if (!state.isPlaying && !hasStrongModifier(shortcut)) return;
 
-      event.preventDefault();
-      togglePlayPause();
+      swallow(event);
+      swallowedCode = event.code;
+      if (!event.repeat) togglePlayPause();
     },
     true
   );
+
+  for (const type of ["keypress", "keyup"]) {
+    window.addEventListener(
+      type,
+      (event) => {
+        if (swallowedCode === null || event.code !== swallowedCode) return;
+        swallow(event);
+        if (type === "keyup") swallowedCode = null;
+      },
+      true
+    );
+  }
+
+  // popup 修改設定（快捷鍵、顏色等）時即時同步到本分頁
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "sync" || !changes[STORAGE_KEY]) return;
+      state.settings = { ...DEFAULT_SETTINGS, ...(changes[STORAGE_KEY].newValue || {}) };
+    });
+  } catch (e) {
+    // storage 不可用時忽略
+  }
 
   // ---------- 與 popup 通訊 ----------
 
@@ -468,6 +576,16 @@
         break;
       case "reader-stop":
         stopReading();
+        sendResponse({ ok: true });
+        break;
+      case "reader-force-stop":
+        // 其他分頁已接手朗讀：只重置本分頁狀態，不可呼叫 synth.cancel()，
+        // 否則會把新分頁剛排入共用佇列的語音一起取消。
+        state.isPlaying = false;
+        state.isPaused = false;
+        state.currentIndex = -1;
+        clearHighlight();
+        notifyStatus();
         sendResponse({ ok: true });
         break;
       case "reader-rate-delta":

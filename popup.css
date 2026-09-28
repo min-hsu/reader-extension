@@ -91,3 +91,46 @@ kbd {
   min-height: 16px;
   margin: 8px 0 0;
 }
+
+.shortcut-item {
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.shortcut-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 6px;
+}
+
+.small-btn {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.small-btn.recording {
+  background: #fff4e6;
+  border-color: #f08c00;
+  color: #d9480f;
+}
+
+.row.compact {
+  margin-bottom: 0;
+  gap: 6px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}

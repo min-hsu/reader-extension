@@ -31,8 +31,35 @@
       <input type="color" id="colorPicker" value="#ffe066" />
     </div>
 
+    <div class="section">
+      <label>快捷鍵</label>
+
+      <div class="shortcut-item">
+        <div class="shortcut-head">
+          <span>全域快捷鍵（任何情況皆可用）</span>
+          <kbd id="globalShortcutValue">讀取中…</kbd>
+        </div>
+        <button id="editGlobalShortcutBtn" class="small-btn">到瀏覽器快捷鍵設定修改</button>
+      </div>
+
+      <div class="shortcut-item">
+        <div class="shortcut-head">
+          <span>頁內快捷鍵</span>
+          <kbd id="pageShortcutValue">空白鍵</kbd>
+        </div>
+        <label class="checkbox-label">
+          <input type="checkbox" id="pageShortcutEnabled" checked />
+          啟用頁內快捷鍵
+        </label>
+        <div class="row compact">
+          <button id="recordPageShortcutBtn" class="small-btn">錄製新按鍵</button>
+          <button id="resetPageShortcutBtn" class="small-btn">重設為空白鍵</button>
+        </div>
+      </div>
+    </div>
+
     <p class="hint">
-      提示：在網頁上按下 <kbd>空白鍵</kbd> 可快速暫停 / 播放（輸入框中不受影響）。<br />
+      提示：頁內快捷鍵若不含 Ctrl / Alt / ⌘，只會在朗讀進行中生效，不會干擾 YouTube 等網站原本的按鍵；輸入框中也不會被攔截。<br />
       在頁面選取一段文字後，可按上方「從選取處開始朗讀」或右鍵選單「從選取處開始朗讀」，會從該處往後接續朗讀。
     </p>
     <p id="statusMsg" class="status"></p>

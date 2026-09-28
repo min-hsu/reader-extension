@@ -21,6 +21,15 @@
   "background": {
     "service_worker": "background.js"
   },
+  "commands": {
+    "toggle-reading": {
+      "suggested_key": {
+        "default": "Alt+Shift+Space",
+        "mac": "Alt+Shift+Space"
+      },
+      "description": "開始 / 暫停 / 繼續朗讀"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
